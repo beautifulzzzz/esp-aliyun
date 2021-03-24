@@ -17,8 +17,16 @@
 #if 1
     #define PRODUCT_KEY                     "a10zictDXlp"
     #define PRODUCT_SECRET                  "8yDKzx1K6KC6RnMh"
+    #define al_device122 1
+#if al_device121
     char device_name[20] = "00000121";     
     char device_secret[80] ="1cde0b8e7b9f688ce8110f712c57aa3c";
+#elif al_device122
+    char device_name[20] = "00000122";     
+    char device_secret[80] ="6eb193f7c1a3f430b0b412e6ed439514";
+#else
+#endif
+
 #else
     #define PRODUCT_KEY                     "a1QynQ2BCLJ"
     #define PRODUCT_SECRET                  "GGhRmKHLS632t8WX"
