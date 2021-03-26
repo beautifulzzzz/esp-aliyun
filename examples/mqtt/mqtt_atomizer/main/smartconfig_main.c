@@ -37,13 +37,38 @@ static const int CONNECTED_BIT = BIT0;
 static const int ESPTOUCH_DONE_BIT = BIT1;
 static const char *TAG = "sc";
 
-void smartconfig_example_task(void * parm);
+void wifi_task(void * parm);
+static void sc_callback(smartconfig_status_t status, void *pdata);
+
+static void wifi_connection(void)
+{
+    wifi_config_t wifi_config = {
+        .sta = {
+            .ssid = "tao",
+            .password = "123456789",
+        },
+    };
+
+    extern esp_err_t app_nvs_get_ssid_password(uint8_t *ssid, uint8_t *password);
+    app_nvs_get_ssid_password(&wifi_config.sta.ssid, &wifi_config.sta.password);
+    ESP_LOGI(TAG,"Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
+
+    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
+
+    esp_wifi_connect();
+}
 
 static esp_err_t event_handler(void *ctx, system_event_t *event)
 {
     switch(event->event_id) {
     case SYSTEM_EVENT_STA_START:
-        xTaskCreate(smartconfig_example_task, "smartconfig_example_task", 10240, NULL, 3, NULL);
+        if(1){//已经配网则直接连接
+            wifi_connection();
+        }else{//否则进入配网状态
+            ESP_ERROR_CHECK( esp_smartconfig_set_type(SC_TYPE_ESPTOUCH) );
+            ESP_ERROR_CHECK( esp_smartconfig_start(sc_callback) );
+        }
+        xTaskCreate(wifi_task, "wifi_task", 10240, NULL, 3, NULL);
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
         xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
@@ -102,7 +127,11 @@ static void sc_callback(smartconfig_status_t status, void *pdata)
                 if(name[i] != device_name[i])break;
             }
             wifi_config->sta.ssid[strlen-8] = 0x00;
-
+#define TEST_DEBUG 0
+#if TEST_DEBUG
+            memcpy(wifi_config->sta.ssid,"tao",4);
+            memcpy(wifi_config->sta.password,"123456789",10);
+#endif
             extern esp_err_t app_nvs_set_ssid_password(uint8_t *ssid, uint8_t *password);
             app_nvs_set_ssid_password(wifi_config->sta.ssid,wifi_config->sta.password);
 
@@ -125,11 +154,10 @@ static void sc_callback(smartconfig_status_t status, void *pdata)
     }
 }
 
-void smartconfig_example_task(void * parm)
+void wifi_task(void * parm)
 {
     EventBits_t uxBits;
-    ESP_ERROR_CHECK( esp_smartconfig_set_type(SC_TYPE_ESPTOUCH) );
-    ESP_ERROR_CHECK( esp_smartconfig_start(sc_callback) );
+
     while (1) {
         uxBits = xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT | ESPTOUCH_DONE_BIT, true, false, portMAX_DELAY); 
         if(uxBits & CONNECTED_BIT) {

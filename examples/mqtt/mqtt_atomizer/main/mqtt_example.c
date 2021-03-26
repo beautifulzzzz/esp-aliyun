@@ -14,6 +14,9 @@
 #include "esp_log.h"
 #include "cJSON.h"
 
+#include "board.h"
+#include "cpt_rtc.h"
+
 #if 1
     #define PRODUCT_KEY                     "a10zictDXlp"
     #define PRODUCT_SECRET                  "8yDKzx1K6KC6RnMh"
@@ -78,6 +81,18 @@ static char *get_device_info_update(void){
     sprintf(device_link_buf,"/sys/%s/%s/thing/deviceinfo/update",PRODUCT_KEY,device_name);
     return device_link_buf;
 }
+static char *get_device_ntp_request(void){
+    memset(device_link_buf,0,sizeof(device_link_buf));
+    sprintf(device_link_buf,"/ext/ntp/%s/%s/request",PRODUCT_KEY,device_name);
+    return device_link_buf;
+}
+static char *get_device_ntp_response(void){
+    memset(device_link_buf,0,sizeof(device_link_buf));
+    sprintf(device_link_buf,"/ext/ntp/%s/%s/response",PRODUCT_KEY,device_name);
+    return device_link_buf;
+}
+
+
 
 #define TOPIC_UPDATE                    get_topic_update() 
 #define TOPIC_ERROR                     get_topic_error()
@@ -88,6 +103,8 @@ static char *get_device_info_update(void){
 #define DEVICE_PROPERTY_SET             get_device_property_set() 
 #define DEVICE_INFO_UPDATE              get_device_info_update() 
 
+#define DEVICE_NTP_REQUEST              get_device_ntp_request()
+#define DEVICE_NTP_RESPONSE             get_device_ntp_response()
 
 
 /* These are pre-defined topics */
@@ -133,7 +150,7 @@ dps_s dps = {
     .time_syn = "1512038504",
 };
 
-char get_value(const char *jsonRoot){
+char mqtt_get_dp_value(const char *jsonRoot){
     // jsonRoot 是您要剖析的数据
     //首先整体判断是否为一个json格式的数据
 	cJSON *pJsonRoot = cJSON_Parse(jsonRoot);
@@ -208,6 +225,27 @@ char get_value(const char *jsonRoot){
     }    
 
     return 1;
+}
+
+char mqtt_get_ntp_value(const char *jsonRoot){
+    // jsonRoot 是您要剖析的数据
+    //首先整体判断是否为一个json格式的数据
+	cJSON *pJsonRoot = cJSON_Parse(jsonRoot);
+	//如果是否json格式数据
+	if (pJsonRoot !=NULL) {
+        cJSON *pParams = cJSON_GetObjectItem(pJsonRoot, "serverSendTime");
+        if(pParams != NULL){
+            EXAMPLE_TRACE("ntp:%ss",pParams->valuestring);
+            int str_len = strlen(pParams->valuestring); 
+            if(str_len > 3){
+                pParams->valuestring[str_len-3] = 0x00;
+                int _date_ = atoi(pParams->valuestring);
+                extern void rtc_update_time(u32 time);
+                rtc_update_time(_date_);
+            }
+        }
+    }
+    return 0;
 }
 
 
@@ -304,8 +342,15 @@ static void _demo_message_arrive(void *pcontext, void *pclient, iotx_mqtt_event_
                           ptopic_info->payload_len,
                           ptopic_info->payload,
                           ptopic_info->payload_len);
-            get_value(ptopic_info->payload);
             EXAMPLE_TRACE("----");
+
+            if(memcmp(ptopic_info->ptopic,DEVICE_PROPERTY_SET,ptopic_info->topic_len) == 0)
+                mqtt_get_dp_value(ptopic_info->payload);
+
+            else if(memcmp(ptopic_info->ptopic,DEVICE_NTP_RESPONSE,ptopic_info->topic_len) == 0)
+                mqtt_get_ntp_value(ptopic_info->payload);
+
+        
             break;
         default:
             EXAMPLE_TRACE("Should NOT arrive here.");
@@ -313,14 +358,85 @@ static void _demo_message_arrive(void *pcontext, void *pclient, iotx_mqtt_event_
     }
 }
 
+void mqtt_client_get_date(void *pclient){
+    char msg_pub[256];
+    iotx_mqtt_topic_info_t topic_msg;
+    memset(&topic_msg, 0x0, sizeof(iotx_mqtt_topic_info_t));
+
+    /* Initialize topic information */
+    memset(msg_pub, 0x0, 256);
+    strcpy(msg_pub, "{\"deviceSendTime\":\"0\"}");
+    topic_msg.qos = IOTX_MQTT_QOS0;
+    topic_msg.retain = 0;
+    topic_msg.dup = 0;
+    topic_msg.payload = (void *)msg_pub;
+    topic_msg.payload_len = strlen(msg_pub);
+
+    int rc = IOT_MQTT_Publish(pclient, DEVICE_NTP_REQUEST, &topic_msg);
+    EXAMPLE_TRACE("\n publish message: \n topic: %s\n payload: \%s\n rc = %d", DEVICE_NTP_RESPONSE, topic_msg.payload, rc);
+
+    IOT_MQTT_Yield(pclient, 200);
+}
+
+void mqtt_client_hello(void *pclient){
+    char msg_pub[256];
+    iotx_mqtt_topic_info_t topic_msg;
+    memset(&topic_msg, 0x0, sizeof(iotx_mqtt_topic_info_t));
+
+    /* Initialize topic information */
+    memset(msg_pub, 0x0, 256);
+    strcpy(msg_pub, "data: hello! start!");
+    topic_msg.qos = IOTX_MQTT_QOS1;
+    topic_msg.retain = 0;
+    topic_msg.dup = 0;
+    topic_msg.payload = (void *)msg_pub;
+    topic_msg.payload_len = strlen(msg_pub);
+
+    int rc = IOT_MQTT_Publish(pclient, TOPIC_UPDATE, &topic_msg);
+    EXAMPLE_TRACE("\n publish message: \n topic: %s\n payload: \%s\n rc = %d", TOPIC_UPDATE, topic_msg.payload, rc);
+
+    IOT_MQTT_Yield(pclient, 200);
+}
+
+void mqtt_client_upload_all(void *pclient){
+    char msg_pub[256];
+    iotx_mqtt_topic_info_t topic_msg;
+    memset(&topic_msg, 0x0, sizeof(iotx_mqtt_topic_info_t));
+
+    /* Initialize topic information */
+    memset(msg_pub, 0x0, 256);
+    topic_msg.qos = IOTX_MQTT_QOS1;
+    topic_msg.retain = 0;
+    topic_msg.dup = 0;
+    
+    static int update_flag = 1;
+    if(update_flag){
+        update_flag = 0;
+        
+        snprintf(msg_pub, sizeof(msg_pub), 
+                "{\"method\":\"thing.event.property.post\",\"id\":\"7\",\"version\":\"1.0\",\"params\":{\"MACAddress\":\"E1E1E2E3E4E7\",\"batpt\":100,\"PowerSwitch\":%d,\"OilShortage\":%d,\"SprayLevel\":%d,\"time_syn\":\"%s\"}}",
+                dps.PowerSwitch, dps.OilShortage, dps.SprayLevel, dps.time_syn);
+
+        topic_msg.payload = (void *)msg_pub;
+        topic_msg.payload_len = strlen(msg_pub);
+
+        int rc = IOT_MQTT_Publish(pclient, DEVICE_PROPERTY_POST, &topic_msg);
+        if (rc < 0) {
+            EXAMPLE_TRACE("error occur when publish");
+        }
+        EXAMPLE_TRACE("packet-id=%u, publish topic msg=%s", (uint32_t)rc, msg_pub);
+    }
+
+    /* handle the MQTT packet received from TCP or SSL connection */
+    IOT_MQTT_Yield(pclient, 1000);
+}
+
 int mqtt_client(void)
 {
-    int rc, msg_len, cnt = 0;
+    int rc, cnt = 0;
     void *pclient;
     iotx_conn_info_pt pconn_info;
     iotx_mqtt_param_t mqtt_params;
-    iotx_mqtt_topic_info_t topic_msg;
-    char msg_pub[256];
 
     /* Device AUTH */
     if (0 != IOT_SetupConnInfo(PRODUCT_KEY, device_name, device_secret, (void **)&pconn_info)) {
@@ -358,23 +474,6 @@ int mqtt_client(void)
     //////////////////////////////////////////////////////////////////////////////////////////////
     //send data to topic
     /* Initialize topic information */
-    memset(&topic_msg, 0x0, sizeof(iotx_mqtt_topic_info_t));
-    strcpy(msg_pub, "update: hello! start!");
-
-    topic_msg.qos = IOTX_MQTT_QOS1;
-    topic_msg.retain = 0;
-    topic_msg.dup = 0;
-    topic_msg.payload = (void *)msg_pub;
-    topic_msg.payload_len = strlen(msg_pub);
-
-    rc = IOT_MQTT_Publish(pclient, TOPIC_UPDATE, &topic_msg);
-    if (rc < 0) {
-        IOT_MQTT_Destroy(&pclient);
-        EXAMPLE_TRACE("error occur when publish");
-        return -1;
-    }
-
-    EXAMPLE_TRACE("\n publish message: \n topic: %s\n payload: \%s\n rc = %d", TOPIC_UPDATE, topic_msg.payload, rc);
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     //Subscribe a topic, then send a top
@@ -403,62 +502,39 @@ int mqtt_client(void)
         EXAMPLE_TRACE("IOT_MQTT_Subscribe() failed, rc = %d", rc);
         return -1;
     }
+    rc = IOT_MQTT_Subscribe(pclient, DEVICE_PROPERTY_POST_REPLY, IOTX_MQTT_QOS1, _demo_message_arrive, NULL);
+    if (rc < 0) {
+        IOT_MQTT_Destroy(&pclient);
+        EXAMPLE_TRACE("IOT_MQTT_Subscribe() failed, rc = %d", rc);
+        return -1;
+    }
+    rc = IOT_MQTT_Subscribe(pclient, DEVICE_NTP_RESPONSE, IOTX_MQTT_QOS0, _demo_message_arrive, NULL);
+    if (rc < 0) {
+        IOT_MQTT_Destroy(&pclient);
+        EXAMPLE_TRACE("IOT_MQTT_Subscribe() failed, rc = %d", rc);
+        return -1;
+    }
 
     IOT_MQTT_Yield(pclient, 200);
 
     HAL_SleepMs(2000);
 
-    /* Initialize topic information */
-    memset(msg_pub, 0x0, 256);
-    strcpy(msg_pub, "data: hello! start!");
-    memset(&topic_msg, 0x0, sizeof(iotx_mqtt_topic_info_t));
-    topic_msg.qos = IOTX_MQTT_QOS1;
-    topic_msg.retain = 0;
-    topic_msg.dup = 0;
-    topic_msg.payload = (void *)msg_pub;
-    topic_msg.payload_len = strlen(msg_pub);
-
-    rc = IOT_MQTT_Publish(pclient, TOPIC_UPDATE, &topic_msg);
-    EXAMPLE_TRACE("\n publish message: \n topic: %s\n payload: \%s\n rc = %d", TOPIC_UPDATE, topic_msg.payload, rc);
-
-    IOT_MQTT_Yield(pclient, 200);
-
     //////////////////////////////////////////////////////////////////////////////////////////////
     //then send a top
+    mqtt_client_hello(pclient);
+    mqtt_client_get_date(pclient);
 
     do {
         /* Generate topic message */
         cnt++;
-        if(update_flag){
-            update_flag = 0;
-            msg_len = snprintf(msg_pub, sizeof(msg_pub), 
-                "{\"method\":\"thing.event.property.post\",\"id\":\"7\",\"version\":\"1.0\",\"params\":{\"MACAddress\":\"E1E1E2E3E4E7\",\"batpt\":100,\"PowerSwitch\":%d,\"OilShortage\":%d,\"SprayLevel\":%d,\"time_syn\":\"%s\"}}",
-                dps.PowerSwitch, dps.OilShortage, dps.SprayLevel, dps.time_syn);
-
-            if (msg_len < 0) {
-                EXAMPLE_TRACE("Error occur! Exit program");
-                return -1;
-            }
-
-            topic_msg.payload = (void *)msg_pub;
-            topic_msg.payload_len = msg_len;
-
-            rc = IOT_MQTT_Publish(pclient, DEVICE_PROPERTY_POST, &topic_msg);
-            if (rc < 0) {
-                EXAMPLE_TRACE("error occur when publish");
-            }
-            EXAMPLE_TRACE("packet-id=%u, publish topic msg=%s", (uint32_t)rc, msg_pub);
-        }
-
-        /* handle the MQTT packet received from TCP or SSL connection */
-        IOT_MQTT_Yield(pclient, 1000);
-
+        
+        mqtt_client_upload_all(pclient);
         /* infinite loop if running with 'loop' argument */
         if (user_argc >= 2 && !strcmp("loop", user_argv[1])) {
             //HAL_SleepMs(2000);
             //cnt = 0;
         }
-        ESP_LOGI(TAG, "min:%u heap:%u", esp_get_minimum_free_heap_size(), esp_get_free_heap_size());
+        //ESP_LOGI(TAG, "min:%u heap:%u", esp_get_minimum_free_heap_size(), esp_get_free_heap_size());
     } while (cnt);
 
     IOT_MQTT_Yield(pclient, 200);

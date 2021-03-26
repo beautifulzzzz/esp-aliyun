@@ -49,6 +49,7 @@ const int CONNECTED_BIT = BIT0;//没连接上wifi不会执行MQTT
 static const char* TAG = "app main";
 extern void initialise_wifi(void);
 extern void gpio_task_init(void);
+extern void app_timing_init(void);
 
 void app_main(){
     ESP_LOGI(TAG, "IDF version: %s", esp_get_idf_version());
@@ -58,5 +59,6 @@ void app_main(){
     ESP_ERROR_CHECK( nvs_flash_init() );
     initialise_wifi();
     gpio_task_init();
+    app_timing_init();
 }
 
