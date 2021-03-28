@@ -27,6 +27,12 @@
 #elif al_device122
     char device_name[20] = "00000122";     
     char device_secret[80] ="6eb193f7c1a3f430b0b412e6ed439514";
+#elif al_device123
+    char device_name[20] = "00000123";     
+    char device_secret[80] ="8afc44c65c4af6a808fe5f074dbeef81";
+#elif al_device124
+    char device_name[20] = "00000124";     
+    char device_secret[80] ="9ca559b3fa5a4a0bdca1eaf37781b389";
 #else
 #endif
 
@@ -144,7 +150,7 @@ typedef struct{
 }dps_s;
 
 dps_s dps = {
-    .PowerSwitch = 0,
+    .PowerSwitch = 1,
     .OilShortage = 0,
     .SprayLevel = 0,
     .time_syn = "1512038504",
@@ -165,7 +171,7 @@ char mqtt_get_dp_value(const char *jsonRoot){
             if(pValue != NULL){
                 EXAMPLE_TRACE("dp: PowerSwitch:%d",pValue->valueint);
                 dps.PowerSwitch = pValue->valueint;      
-
+                    
                 send_data_len = sprintf(send_data,"PowerSwitch:%d",dps.PowerSwitch);
                 ESP_LOGI(TAG,"%s",send_data);
                 //app_uart_send_data(send_data,send_data_len);
@@ -214,11 +220,15 @@ char mqtt_get_dp_value(const char *jsonRoot){
                     memcpy(&(dps.timer[i-1][0]),pValue->valuestring,strlen(pValue->valuestring)+1);
 
                     send_data_len = sprintf(send_data,"timer%d:%s",i,&(dps.timer[i-1][0]));
-                    //app_uart_send_data(send_data,send_data_len);
+
+                    extern int  app_timing_init_from_string(char *str, u8 str_len);
+                    if(0 == app_timing_init_from_string(pValue->valuestring,strlen(pValue->valuestring))){
+                        u8 timer_id = pValue->valuestring[0]-'0' - 1;
+                        extern esp_err_t app_nvs_set_timing(char *timing, uint8_t index );
+                        app_nvs_set_timing(pValue->valuestring,timer_id);
+                    }
                 }
-
             }
-
        
             update_flag = 1;
         }
@@ -242,6 +252,9 @@ char mqtt_get_ntp_value(const char *jsonRoot){
                 int _date_ = atoi(pParams->valuestring);
                 extern void rtc_update_time(u32 time);
                 rtc_update_time(_date_);
+
+                extern void app_timing_init_from_flash(void);
+                app_timing_init_from_flash();
             }
         }
     }

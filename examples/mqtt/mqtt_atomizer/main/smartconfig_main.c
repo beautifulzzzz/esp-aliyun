@@ -39,6 +39,8 @@ static const char *TAG = "sc";
 
 void wifi_task(void * parm);
 static void sc_callback(smartconfig_status_t status, void *pdata);
+extern esp_err_t app_nvs_set_reset(uint8_t *reset);
+extern esp_err_t app_nvs_get_reset(uint8_t *reset);
 
 static void wifi_connection(void)
 {
@@ -58,19 +60,24 @@ static void wifi_connection(void)
     esp_wifi_connect();
 }
 
+uint8_t wifi_state = 3;
 static esp_err_t event_handler(void *ctx, system_event_t *event)
 {
     switch(event->event_id) {
-    case SYSTEM_EVENT_STA_START:
-        if(1){//已经配网则直接连接
+    case SYSTEM_EVENT_STA_START:{
+        uint8_t reset = 0;
+        if(ESP_OK == app_nvs_get_reset(&reset) && reset == 2){//已经配网则直接连接
             wifi_connection();
+            wifi_state = 1;
         }else{//否则进入配网状态
             ESP_ERROR_CHECK( esp_smartconfig_set_type(SC_TYPE_ESPTOUCH) );
             ESP_ERROR_CHECK( esp_smartconfig_start(sc_callback) );
+            wifi_state = 0;
         }
         xTaskCreate(wifi_task, "wifi_task", 10240, NULL, 3, NULL);
-        break;
+        }break;
     case SYSTEM_EVENT_STA_GOT_IP:
+        wifi_state = 2;
         xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
@@ -129,8 +136,8 @@ static void sc_callback(smartconfig_status_t status, void *pdata)
             wifi_config->sta.ssid[strlen-8] = 0x00;
 #define TEST_DEBUG 0
 #if TEST_DEBUG
-            memcpy(wifi_config->sta.ssid,"tao",4);
-            memcpy(wifi_config->sta.password,"123456789",10);
+            memcpy(wifi_config->sta.ssid,"1202",5);
+            memcpy(wifi_config->sta.password,"1234567890",11);
 #endif
             extern esp_err_t app_nvs_set_ssid_password(uint8_t *ssid, uint8_t *password);
             app_nvs_set_ssid_password(wifi_config->sta.ssid,wifi_config->sta.password);
@@ -162,6 +169,9 @@ void wifi_task(void * parm)
         uxBits = xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT | ESPTOUCH_DONE_BIT, true, false, portMAX_DELAY); 
         if(uxBits & CONNECTED_BIT) {
             ESP_LOGI(TAG, "WiFi Connected to ap");
+
+            uint8_t reset = 3;
+            app_nvs_set_reset(&reset);
 
             app_main_paras_t paras;
             const char* argv[] = {"main", "loop"};

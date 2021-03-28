@@ -92,3 +92,39 @@ esp_err_t app_nvs_set_reset(uint8_t *reset){
 }
 
 
+esp_err_t app_nvs_get_timing(char *timing,uint8_t index){
+    nvs_handle timing_handle;
+    size_t len = 40;
+    
+
+    nvs_open("timing", NVS_READONLY, &timing_handle);
+
+    char key[] = "timing0";
+    key[6]+=index;
+    esp_err_t ret = nvs_get_str(timing_handle, key, timing, &len);
+
+    nvs_close(timing_handle);   
+
+    if(ret == ESP_OK){
+        ESP_LOGI(TAG,"get_timing[%d] = %s\r\n",index,timing);
+        return ESP_OK;
+    }
+
+    return ESP_FAIL;
+}
+
+
+esp_err_t app_nvs_set_timing(char *timing, uint8_t index ){
+    nvs_handle timing_handle;
+
+    nvs_open("timing", NVS_READWRITE, &timing_handle);
+    char key[] = "timing0";
+    key[6]+=index;
+    esp_err_t ret = nvs_set_str(timing_handle, key, (char *)timing);
+
+    ESP_LOGI(TAG,"save_timing[%d] = %s\r\n",index, timing);
+    nvs_close(timing_handle);   
+
+    return ret;
+}
+
