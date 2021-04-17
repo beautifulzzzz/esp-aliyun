@@ -66,7 +66,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
     switch(event->event_id) {
     case SYSTEM_EVENT_STA_START:{
         uint8_t reset = 0;
-        if(ESP_OK == app_nvs_get_reset(&reset) && reset == 2){//已经配网则直接连接
+        if(ESP_OK == app_nvs_get_reset(&reset) && reset == 3){//已经配网则直接连接
             wifi_connection();
             wifi_state = 1;
         }else{//否则进入配网状态

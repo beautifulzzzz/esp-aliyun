@@ -164,6 +164,8 @@ void button_task_run(void *arg){
                         uint8_t reset = 0;
                         extern esp_err_t app_nvs_set_reset(uint8_t *reset);
                         app_nvs_set_reset(&reset);
+                        extern esp_err_t app_nvs_erase_timing(void );
+                        app_nvs_erase_timing();
                         ESP_LOGI(TAG,"long press");
                         
                         reboot = 1;

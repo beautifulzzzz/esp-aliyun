@@ -20,7 +20,7 @@
 #if 1
     #define PRODUCT_KEY                     "a10zictDXlp"
     #define PRODUCT_SECRET                  "8yDKzx1K6KC6RnMh"
-    #define al_device122 1
+    #define al_device123 1
 #if al_device121
     char device_name[20] = "00000121";     
     char device_secret[80] ="1cde0b8e7b9f688ce8110f712c57aa3c";

@@ -34,7 +34,6 @@ typedef struct{
 }my_timing_s;
 
 my_timing_s my_timing;
-u16 on[MAX_NUM_TIMING/2];//当前时间是否在区间
 
 void rtc_update_time(u32 time){
     rtc_update_flag = 1;
@@ -72,17 +71,20 @@ void rtc_task_run(void *arg){
                 cpt_rtc_date_s cpt_rtc_date;
                 cpt_rtc.get_date(&cpt_rtc_date);
                 /*
-                ESP_LOGI(TAG,"%04d-%02d-%02d %02d:%02d:%02d",
-                                    cpt_rtc_date.year,
-                                    cpt_rtc_date.month,
-                                    cpt_rtc_date.monthday,
-                                    cpt_rtc_date.hour,
-                                    cpt_rtc_date.minute,
-                                    cpt_rtc_date.second);
-                */
+                   ESP_LOGI(TAG,"%04d-%02d-%02d %02d:%02d:%02d",
+                   cpt_rtc_date.year,
+                   cpt_rtc_date.month,
+                   cpt_rtc_date.monthday,
+                   cpt_rtc_date.hour,
+                   cpt_rtc_date.minute,
+                   cpt_rtc_date.second);
+                   */
                 int i;
                 for(i=0;i<MAX_NUM_TIMING/2;i++){
-                    if(on[i] ==1){
+                    u16 now = cpt_rtc_date.hour*60+cpt_rtc_date.minute;
+                    if(now >= my_timing.from[i] && now < my_timing.to[i] && ((1<<(8-cpt_rtc_date.weekday)) & my_timing.day[i]) != 0){
+                        ESP_LOGI(TAG,"on:%d",i);
+
                         if(step == 0){//pen
                             app_atomizer_on(1);
                             second++;
@@ -107,13 +109,13 @@ void rtc_task_run(void *arg){
                         //ESP_LOGI(TAG,"step:%d,second:%d,minute:%d",step,second,minute);
                         break;
                     }
-
-                    if(i==MAX_NUM_TIMING/2){
-                        step = 0;
-                        second = 0;
-                        minute = 0;
-                        app_atomizer_on(0);
-                    }
+                }
+                if(i==MAX_NUM_TIMING/2){
+                    ESP_LOGI(TAG,"not on all");
+                    step = 0;
+                    second = 0;
+                    minute = 0;
+                    app_atomizer_on(0);
                 }
             }
         }
@@ -134,7 +136,6 @@ u8 timing_start_cb(u8 index){
             date2.second,
             date2.weekday);
 
-    on[index/2] = 1;
     return 1;
 }
 
@@ -152,13 +153,10 @@ u8 timing_end_cb(u8 index){
             date2.second,
             date2.weekday);
 
-    on[index/2] = 0;
-    app_atomizer_on(0); 
     return 1;
 }
 
 u8 timing_work_mode_set(u8 timer_id,u8 is_on,u16 time_from,u16 time_to,u8 is_repet,u8 day, u16 _duty, u16 _keep){
-	timer_id--;
 	if(timer_id >= 8)return 0;
 	mITimingFunc.set(&mITiming[2*timer_id],1,time_from,is_repet,day,&timing_start_cb);
 	mITimingFunc.set(&mITiming[2*timer_id+1],1,time_to,is_repet,day,&timing_end_cb);
@@ -169,16 +167,6 @@ u8 timing_work_mode_set(u8 timer_id,u8 is_on,u16 time_from,u16 time_to,u8 is_rep
     my_timing.day[timer_id] = day;
 	my_timing.duty[timer_id] = _duty;
     my_timing.keep[timer_id] = _keep;
-
-    if(rtc_update_flag){
-        cpt_rtc_date_s date2;
-        cpt_rtc.get_date(&date2);
-        u16 now = date2.hour*60+date2.minute;
-        if(now >= time_from && now < time_to && ((1<<(8-date2.weekday)) & day) != 0){
-            on[timer_id] = 1;
-            ESP_LOGI(TAG,"on:%d",timer_id);
-        } 
-    }
 
     return 1;
 }
@@ -323,8 +311,6 @@ void app_timing_init(void){
 
     for(int i=0;i<MAX_NUM_TIMING;i++)
         mITimingFunc.init(&mITiming[i]);
-
-    memset(on,0,sizeof(on));
 
     xTaskCreate(rtc_task_run, "app rtc_task", 4096, NULL, 2, NULL);
 }

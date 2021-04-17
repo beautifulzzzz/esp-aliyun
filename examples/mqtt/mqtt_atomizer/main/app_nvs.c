@@ -128,3 +128,17 @@ esp_err_t app_nvs_set_timing(char *timing, uint8_t index ){
     return ret;
 }
 
+esp_err_t app_nvs_erase_timing(void ){
+    nvs_handle timing_handle;
+    esp_err_t ret;
+    nvs_open("timing", NVS_READWRITE, &timing_handle);
+    char key[8][8]={"timing0","timing1","timing2","timing3","timing4","timing5","timing6","timing7"};
+    for(int i=0;i<8;i++){
+        ret = nvs_erase_key(timing_handle, key[i]);
+
+        ESP_LOGI(TAG,"erase_timing[%d]= %d, key=%s\r\n",i,ret,key[i]);
+    }
+    nvs_close(timing_handle);   
+    return ret;
+}
+
