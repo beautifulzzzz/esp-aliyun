@@ -19,9 +19,9 @@
     #define DEVICE_NAME             "ota_test"
     #define DEVICE_SECRET           "67szT5tQNMIu3sbrd3UwLhs7M73wTHXQ"
 #else
-    #define PRODUCT_KEY             "a1MZxOdcBnO"
-    #define DEVICE_NAME             "test_01"
-    #define DEVICE_SECRET           "t9GmMf2jb3LgWfXBaZD2r3aJrfVWBv56"
+    #define PRODUCT_KEY             "a1QynQ2BCLJ"
+    #define DEVICE_NAME             "device1"
+    #define DEVICE_SECRET           "TbJkO9e2cMusqkDzXdasoVVJe7OdgjXx"
 #endif
 
 char g_product_key[PRODUCT_KEY_LEN + 1];
@@ -185,6 +185,7 @@ static int _ota_mqtt_client(void)
         goto do_exit;
     }
 
+    EXAMPLE_TRACE("VERSION:iotx_ver_1.0.0");
     if (0 != IOT_OTA_ReportVersion(h_ota, "iotx_ver_1.0.0")) {
         rc = -1;
         EXAMPLE_TRACE("report OTA version failed");
