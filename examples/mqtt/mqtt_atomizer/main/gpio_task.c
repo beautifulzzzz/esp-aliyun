@@ -16,7 +16,7 @@
 #include "driver/gpio.h"
 #include "esp_task_wdt.h"
 
-
+//https://www.cnblogs.com/smartlife/articles/9061040.html
 #define GPIO_D2             4
 #define GPIO_D4             2
 #define GPIO_D6             12
@@ -94,7 +94,10 @@ void gpio_task_run(void *arg){
         gpio_set_level(GPIO_PWM, pwm_state);
         if(atomizer_on_off == 1){
             pwm_state = !pwm_state;
-            cnt = 5;
+            if(pwm_state != 0)
+                cnt = 8;
+            else
+                cnt = 2;
             while(cnt--);
             os_delay_us(3);
         }else{
@@ -178,7 +181,7 @@ void button_task_run(void *arg){
     }
 }
 
-void gpio_task_init(void){
+void gpio_init(void){
     gpio_config_t io_conf;
     //disable interrupt
     io_conf.intr_type = GPIO_INTR_DISABLE;
@@ -193,6 +196,8 @@ void gpio_task_init(void){
     //configure GPIO with the given settings
     gpio_config(&io_conf);
 
+    gpio_set_level(GPIO_PWM, 0);
+
     //bit mask of the pins, use GPIO4/5 here
     io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
     //set as input mode
@@ -200,7 +205,9 @@ void gpio_task_init(void){
     //enable pull-up mode
     io_conf.pull_up_en = 1;
     gpio_config(&io_conf);
+}
 
+void gpio_task_init(void){
     xTaskCreate(gpio_task_run, "gpio_task", 4096, NULL, 1, NULL);
     xTaskCreate(timing_task_run, "timing_task", 4096, NULL, 2, NULL);
     xTaskCreate(button_task_run, "button_task", 4096, NULL, 2, NULL);
