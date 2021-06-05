@@ -55,8 +55,7 @@ void rtc_update_time(u32 time){
 extern void app_atomizer_on(int enable);
 void rtc_task_run(void *arg){
     u8 times = 0;
-    u8 second = 0;
-    u8 minute = 0;
+    u32 second = 0;
     u8 count = 0;
     u8 step = 0;//0: pen; 1: not pen
     while(1<2){
@@ -90,23 +89,17 @@ void rtc_task_run(void *arg){
                             second++;
                             if(second >= my_timing.keep[i]){
                                 step = 1;
-                                minute = 0;
                                 second = 0;
                             }
                         }else{//not pen
                             app_atomizer_on(0);
                             second++;
-                            if(second == 60){
+                            if(second >= my_timing.duty[i]){
+                                step = 0;
                                 second = 0;
-                                minute++;
-                                if(minute >= my_timing.duty[i]){
-                                    step = 0;
-                                    minute = 0;
-                                    second = 0;
-                                }
                             }
                         }
-                        //ESP_LOGI(TAG,"step:%d,second:%d,minute:%d",step,second,minute);
+                        //ESP_LOGI(TAG,"step:%d,second:%d",step,second);
                         break;
                     }
                 }
@@ -114,7 +107,6 @@ void rtc_task_run(void *arg){
                     ESP_LOGI(TAG,"not on all");
                     step = 0;
                     second = 0;
-                    minute = 0;
                     app_atomizer_on(0);
                 }
             }

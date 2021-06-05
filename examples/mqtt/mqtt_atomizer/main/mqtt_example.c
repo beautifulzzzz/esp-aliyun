@@ -20,7 +20,7 @@
 #if 1
     #define PRODUCT_KEY                     "a10zictDXlp"
     #define PRODUCT_SECRET                  "8yDKzx1K6KC6RnMh"
-    #define al_device123 1
+    #define al_device128 1
 #if al_device121
     char device_name[20] = "00000121";     
     char device_secret[80] ="1cde0b8e7b9f688ce8110f712c57aa3c";
@@ -33,6 +33,24 @@
 #elif al_device124
     char device_name[20] = "00000124";     
     char device_secret[80] ="9ca559b3fa5a4a0bdca1eaf37781b389";
+#elif al_device125
+    char device_name[20] = "00000125";     
+    char device_secret[80] ="c924632016e6780fe434475dfe151069";
+#elif al_device126
+    char device_name[20] = "00000126";     
+    char device_secret[80] ="fa8cbb276a91c9f3dae861b1e43ea61c";
+#elif al_device127
+    char device_name[20] = "00000127";     
+    char device_secret[80] ="291db7499752585d5a22e92d01f38ca6";
+#elif al_device128
+    char device_name[20] = "00000128";     
+    char device_secret[80] ="e65c18b8c69fea44092e3c6ea43524f6";
+#elif al_device129
+    char device_name[20] = "00000129";     
+    char device_secret[80] ="bcdd69e17ea1cc9cf26ee5fc1dc7cdf4";
+#elif al_device130
+    char device_name[20] = "00000130";     
+    char device_secret[80] ="994ac284597a82dc7c071992fac064e0";
 #else
 #endif
 
